@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLocalList, BOARD_SEED, Post, Comment, newId, fmtDate } from '@/lib/postStore';
 import { useBoards, boardHref, MAIN_BOARD_ID, BoardPerm } from '@/lib/boardStore';
 import { renderBody } from '@/lib/sanitize';
+import { InteractiveHtml } from '@/components/ui/InteractiveHtml';
 import { KInput } from '@/components/ui/Kit';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { GuestIdBar } from '@/components/ui/GuestId';
