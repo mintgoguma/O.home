@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React from 'react';
 
 interface InteractiveHtmlProps {
   html: string;
@@ -9,32 +9,17 @@ interface InteractiveHtmlProps {
 export function InteractiveHtml({
   html,
 }: InteractiveHtmlProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const iframe = iframeRef.current;
-
-    if (!iframe) return;
-
-    const doc = iframe.contentDocument;
-
-    if (!doc) return;
-
-    doc.open();
-    doc.write(html);
-    doc.close();
-  }, [html]);
-
   return (
     <iframe
-      ref={iframeRef}
       title="Interactive HTML"
-      sandbox="allow-scripts"
+      srcDoc={html}
+      sandbox="allow-scripts allow-same-origin"
       style={{
         width: '100%',
-        minHeight: 600,
+        minHeight: 800,
         border: 0,
         display: 'block',
+        background: 'transparent',
       }}
     />
   );
