@@ -1,8 +1,13 @@
-```tsx
 'use client';
-// 게시판 글쓰기/수정 (4.2 / 5.2 다중 게시판) — MD/HTML 모드 선택 + 실시간 미리보기 + 접기/비밀글/공지 설정
-// ?edit=<글 id> 로 진입하면 수정 모드 (작성자·관리자만)
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+
+// 게시판 글쓰기/수정
+import React, {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
@@ -13,13 +18,29 @@ import {
   FoldType,
   PostContentType,
 } from '@/lib/postStore';
-import { useBoards, boardHref, MAIN_BOARD_ID } from '@/lib/boardStore';
+import {
+  useBoards,
+  boardHref,
+  MAIN_BOARD_ID,
+} from '@/lib/boardStore';
 import { renderBody } from '@/lib/sanitize';
-import { KInput, KTextarea, KSelect, KCheck } from '@/components/ui/Kit';
-import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
+import {
+  KInput,
+  KTextarea,
+  KSelect,
+  KCheck,
+} from '@/components/ui/Kit';
+import {
+  CropEditor,
+  CropImg,
+  CropValue,
+} from '@/components/ui/CropEditor';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { useToast } from '@/components/ui/Toast';
-import { PageTitle, EditableDesc } from '@/components/ui/PageText';
+import {
+  PageTitle,
+  EditableDesc,
+} from '@/components/ui/PageText';
 
 function WriteInner() {
   const router = useRouter();
@@ -28,18 +49,26 @@ function WriteInner() {
   const params = useSearchParams();
   const editPid = params.get('edit');
 
-  const [posts, setPosts, postsLoaded] = useLocalList<Post>(
-    'ohome.board.v1',
-    BOARD_SEED
-  );
+  const [posts, setPosts, postsLoaded] =
+    useLocalList<Post>(
+      'ohome.board.v1',
+      BOARD_SEED
+    );
 
   const editing = editPid
-    ? posts.find(p => p.id === editPid)
+    ? posts.find((p) => p.id === editPid)
     : undefined;
 
-  const bid = editing?.boardId ?? params.get('b') ?? MAIN_BOARD_ID;
+  const bid =
+    editing?.boardId ??
+    params.get('b') ??
+    MAIN_BOARD_ID;
+
   const { boards } = useBoards();
-  const board = boards.find(b => b.id === bid) ?? boards[0];
+
+  const board =
+    boards.find((b) => b.id === bid) ??
+    boards[0];
 
   const [title, setTitle] = useState('');
   const [writeMode, setWriteMode] =
@@ -48,20 +77,20 @@ function WriteInner() {
   const [body, setBody] = useState('');
 
   // HTML 본문 방식
-  // normal = 일반 HTML (스크립트 실행 안 함)
-  // interactive = 인터랙티브 HTML (상세 페이지에서 별도 iframe으로 실행)
+  // normal = 일반 HTML
+  // interactive = 인터랙티브 HTML
   const [contentType, setContentType] =
     useState<PostContentType>('normal');
 
   const [category, setCategory] = useState('');
 
-  // 말머리 기본값 — 게시판별 목록(5.2) 로드 후 첫 항목
-  React.useEffect(() => {
-    if (!category && board.cats[0]) {
+  // 말머리 기본값
+  useEffect(() => {
+    if (!category && board?.cats?.[0]) {
       setCategory(board.cats[0].label);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board.cats.length]);
+  }, [board?.cats?.length]);
 
   const [secret, setSecret] = useState(false);
   const [notice, setNotice] = useState(false);
@@ -69,18 +98,20 @@ function WriteInner() {
   const [foldType, setFoldType] =
     useState<FoldType | 'none'>('none');
 
-  const [foldLabel, setFoldLabel] = useState('');
+  const [foldLabel, setFoldLabel] =
+    useState('');
 
-  // 티켓 스킨 대표 이미지 (v1.9)
+  // 티켓 스킨 대표 이미지
   const [thumbSrc, setThumbSrc] =
     useState<string | undefined>(undefined);
 
   const [thumbCrop, setThumbCrop] =
     useState<CropValue | undefined>(undefined);
 
-  const [cropOpen, setCropOpen] = useState(false);
+  const [cropOpen, setCropOpen] =
+    useState(false);
 
-  // 본문 이미지 목록 — HTML <img> + Markdown 이미지
+  // 본문 이미지 목록
   const bodyImages = useMemo(() => {
     const out: string[] = [];
 
@@ -99,7 +130,7 @@ function WriteInner() {
     return [...new Set(out)];
   }, [body]);
 
-  // 대표로 지정한 이미지가 본문에서 삭제되면 해제
+  // 대표 이미지가 본문에서 삭제되면 해제
   useEffect(() => {
     if (
       thumbSrc &&
@@ -110,7 +141,7 @@ function WriteInner() {
     }
   }, [bodyImages, thumbSrc]);
 
-  // 수정 모드 — 저장본 로드가 끝나면 폼을 한 번 채움
+  // 수정 모드 데이터 적용
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -122,7 +153,9 @@ function WriteInner() {
       return;
     }
 
-    const p = posts.find(x => x.id === editPid);
+    const p = posts.find(
+      (x) => x.id === editPid
+    );
 
     if (!p) return;
 
@@ -131,27 +164,30 @@ function WriteInner() {
     setTitle(p.title);
     setBody(p.body);
 
-    // 에디터로 쓴 글은 에디터로 다시 연다.
     setWriteMode(
       p.mode === 'md'
         ? 'md'
-        : (
-            p.authored === 'editor'
-              ? 'editor'
-              : 'html'
-          )
+        : p.authored === 'editor'
+          ? 'editor'
+          : 'html'
     );
 
     setCategory(p.category);
 
-    // 기존 글은 contentType이 없을 수 있으므로 normal로 처리
-    setContentType(p.contentType ?? 'normal');
+    setContentType(
+      p.contentType ?? 'normal'
+    );
 
     setSecret(p.secret);
     setNotice(p.notice);
 
-    setFoldType(p.fold?.type ?? 'none');
-    setFoldLabel(p.fold?.label ?? '');
+    setFoldType(
+      p.fold?.type ?? 'none'
+    );
+
+    setFoldLabel(
+      p.fold?.label ?? ''
+    );
 
     setThumbSrc(p.thumbSrc);
     setThumbCrop(p.thumbCrop);
@@ -159,12 +195,14 @@ function WriteInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editPid, postsLoaded, posts]);
 
-  // Markdown / 일반 HTML 미리보기
-  // 인터랙티브 HTML도 작성 화면에서는 스크립트를 실행하지 않는다.
+  // 미리보기
+  // 인터랙티브 HTML도 작성 화면에서는 실행하지 않음
   const preview = useMemo(
     () =>
       renderBody(
-        writeMode === 'md' ? 'md' : 'html',
+        writeMode === 'md'
+          ? 'md'
+          : 'html',
         body
       ),
     [writeMode, body]
@@ -175,38 +213,47 @@ function WriteInner() {
       <section className="page">
         <div className="page-head">
           <PageTitle>WRITE</PageTitle>
-          <p>글쓰기는 로그인 후 이용할 수 있습니다</p>
+          <p>
+            글쓰기는 로그인 후 이용할 수 있습니다
+          </p>
         </div>
       </section>
     );
   }
 
   const post = () => {
-    if (!title.trim() || !body.trim()) {
+    if (
+      !title.trim() ||
+      !body.trim()
+    ) {
       toast('제목과 내용을 입력해 주세요');
       return;
     }
 
+    // 수정
     if (editing) {
-      // 수정 — 작성자 본인만
-      if (editing.authorId !== user.id) {
-        toast('수정은 작성자 본인만 할 수 있습니다');
+      if (
+        editing.authorId !== user.id
+      ) {
+        toast(
+          '수정은 작성자 본인만 할 수 있습니다'
+        );
         return;
       }
 
       setPosts(
-        posts.map(p =>
+        posts.map((p) =>
           p.id === editing.id
             ? {
                 ...p,
                 title: title.trim(),
                 body,
+
                 mode:
                   writeMode === 'md'
                     ? 'md'
                     : 'html',
 
-                // HTML일 때만 실제 선택값 저장
                 contentType:
                   writeMode === 'html'
                     ? contentType
@@ -219,6 +266,7 @@ function WriteInner() {
 
                 category,
                 secret,
+
                 notice: isAdmin
                   ? notice
                   : p.notice,
@@ -242,13 +290,21 @@ function WriteInner() {
       );
 
       toast('수정되었습니다');
-      router.push(`/board/${editing.id}`);
+
+      // 템플릿 문자열 대신 문자열 연결 사용
+      router.push(
+        '/board/' + editing.id
+      );
+
       return;
     }
 
+    // 새 글
     const p: Post = {
       id: newId(),
+
       title: title.trim(),
+
       body,
 
       mode:
@@ -256,7 +312,6 @@ function WriteInner() {
           ? 'md'
           : 'html',
 
-      // HTML일 때만 일반/인터랙티브 저장
       contentType:
         writeMode === 'html'
           ? contentType
@@ -265,10 +320,13 @@ function WriteInner() {
       category,
 
       author: user.nickname,
+
       authorId: user.id,
+
       date: new Date().toISOString(),
 
       secret,
+
       notice: isAdmin && notice,
 
       fold:
@@ -287,13 +345,18 @@ function WriteInner() {
       boardId: board.id,
 
       thumbSrc,
+
       thumbCrop,
     };
 
     setPosts([p, ...posts]);
 
     toast('등록되었습니다');
-    router.push(`/board/${p.id}`);
+
+    // 템플릿 문자열 대신 문자열 연결 사용
+    router.push(
+      '/board/' + p.id
+    );
   };
 
   return (
@@ -310,7 +373,6 @@ function WriteInner() {
       </div>
 
       <div className="write-grid">
-
         {/* 좌: 본문 */}
         <div
           className="panel"
@@ -326,7 +388,7 @@ function WriteInner() {
 
             <KInput
               value={title}
-              onChange={e =>
+              onChange={(e) =>
                 setTitle(e.target.value)
               }
               style={{ flex: 1 }}
@@ -395,7 +457,9 @@ function WriteInner() {
               {writeMode === 'html' && (
                 <div
                   className="form-row"
-                  style={{ marginBottom: 12 }}
+                  style={{
+                    marginBottom: 12,
+                  }}
                 >
                   <label
                     className="k-label"
@@ -407,12 +471,15 @@ function WriteInner() {
                   <div className="mini-seg">
                     <button
                       className={
-                        contentType === 'normal'
+                        contentType ===
+                        'normal'
                           ? 'on'
                           : ''
                       }
                       onClick={() =>
-                        setContentType('normal')
+                        setContentType(
+                          'normal'
+                        )
                       }
                     >
                       일반 HTML
@@ -420,12 +487,15 @@ function WriteInner() {
 
                     <button
                       className={
-                        contentType === 'interactive'
+                        contentType ===
+                        'interactive'
                           ? 'on'
                           : ''
                       }
                       onClick={() =>
-                        setContentType('interactive')
+                        setContentType(
+                          'interactive'
+                        )
                       }
                     >
                       인터랙티브
@@ -448,14 +518,16 @@ function WriteInner() {
                     : '<div>HTML 코드를 작성/붙여넣기...</div>'
                 }
                 value={body}
-                onChange={e =>
+                onChange={(e) =>
                   setBody(e.target.value)
                 }
               />
 
               <div
                 className="preview-box"
-                style={{ marginTop: 14 }}
+                style={{
+                  marginTop: 14,
+                }}
               >
                 <div className="pv-label">
                   PREVIEW — 실시간 미리보기
@@ -474,7 +546,9 @@ function WriteInner() {
           {/* 티켓 스킨 대표 이미지 */}
           {board.skin === 'ticket' &&
             bodyImages.length > 0 && (
-              <div style={{ marginTop: 14 }}>
+              <div
+                style={{ marginTop: 14 }}
+              >
                 <label
                   className="k-label"
                   style={{ marginBottom: 7 }}
@@ -489,7 +563,7 @@ function WriteInner() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  {bodyImages.map(src => (
+                  {bodyImages.map((src) => (
                     <div
                       key={src}
                       data-tip={
@@ -498,9 +572,13 @@ function WriteInner() {
                           : '대표로 선택'
                       }
                       onClick={() => {
-                        if (thumbSrc !== src) {
+                        if (
+                          thumbSrc !== src
+                        ) {
                           setThumbSrc(src);
-                          setThumbCrop(undefined);
+                          setThumbCrop(
+                            undefined
+                          );
                         }
 
                         setCropOpen(true);
@@ -514,10 +592,12 @@ function WriteInner() {
                           'var(--cur-pointer,pointer)',
                         position: 'relative',
                         flexShrink: 0,
+
                         outline:
                           thumbSrc === src
                             ? '2px solid var(--accent)'
                             : '1px solid var(--line)',
+
                         outlineOffset: 2,
                       }}
                     >
@@ -533,16 +613,19 @@ function WriteInner() {
                       {thumbSrc === src && (
                         <span
                           style={{
-                            position: 'absolute',
+                            position:
+                              'absolute',
                             right: 4,
                             top: 4,
                             fontSize: 9,
                             fontWeight: 700,
-                            letterSpacing: '.08em',
+                            letterSpacing:
+                              '.08em',
                             background:
                               'var(--accent)',
                             color: '#fff',
-                            padding: '2px 6px',
+                            padding:
+                              '2px 6px',
                             borderRadius: 999,
                           }}
                         >
@@ -560,7 +643,9 @@ function WriteInner() {
         <div>
           <div
             className="panel widget"
-            style={{ marginBottom: 14 }}
+            style={{
+              marginBottom: 14,
+            }}
           >
             <h4>설정</h4>
 
@@ -576,10 +661,12 @@ function WriteInner() {
                 minWidth={130}
                 value={category}
                 onChange={setCategory}
-                options={board.cats.map(x => ({
-                  value: x.label,
-                  label: x.label,
-                }))}
+                options={board.cats.map(
+                  (x) => ({
+                    value: x.label,
+                    label: x.label,
+                  })
+                )}
                 placeholder="말머리 선택"
               />
             </div>
@@ -608,7 +695,9 @@ function WriteInner() {
 
           <div
             className="panel widget"
-            style={{ marginBottom: 14 }}
+            style={{
+              marginBottom: 14,
+            }}
           >
             <h4>접기 (6.2)</h4>
 
@@ -623,9 +712,11 @@ function WriteInner() {
                 checked={
                   foldType === 'spoiler'
                 }
-                onChange={v =>
+                onChange={(v) =>
                   setFoldType(
-                    v ? 'spoiler' : 'none'
+                    v
+                      ? 'spoiler'
+                      : 'none'
                   )
                 }
               />
@@ -635,9 +726,11 @@ function WriteInner() {
                 checked={
                   foldType === 'adult'
                 }
-                onChange={v =>
+                onChange={(v) =>
                   setFoldType(
-                    v ? 'adult' : 'none'
+                    v
+                      ? 'adult'
+                      : 'none'
                   )
                 }
               />
@@ -647,9 +740,11 @@ function WriteInner() {
                 checked={
                   foldType === 'custom'
                 }
-                onChange={v =>
+                onChange={(v) =>
                   setFoldType(
-                    v ? 'custom' : 'none'
+                    v
+                      ? 'custom'
+                      : 'none'
                   )
                 }
               />
@@ -658,7 +753,7 @@ function WriteInner() {
                 <KInput
                   placeholder="접기 문구"
                   value={foldLabel}
-                  onChange={e =>
+                  onChange={(e) =>
                     setFoldLabel(
                       e.target.value
                     )
@@ -674,7 +769,8 @@ function WriteInner() {
               onClick={() =>
                 router.push(
                   editing
-                    ? `/board/${editing.id}`
+                    ? '/board/' +
+                        editing.id
                     : boardHref(board.id)
                 )
               }
@@ -686,13 +782,15 @@ function WriteInner() {
               className="btn btn-accent"
               onClick={post}
             >
-              {editing ? 'SAVE' : 'POST'}
+              {editing
+                ? 'SAVE'
+                : 'POST'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* 대표 썸네일 위치 지정 — 16:9 (티켓 스킨) */}
+      {/* 대표 썸네일 위치 지정 */}
       {cropOpen && thumbSrc && (
         <CropEditor
           open
@@ -702,7 +800,7 @@ function WriteInner() {
           onClose={() =>
             setCropOpen(false)
           }
-          onApply={c => {
+          onApply={(c) => {
             setThumbCrop(c);
             setCropOpen(false);
           }}
@@ -713,7 +811,6 @@ function WriteInner() {
 }
 
 export default function BoardWritePage() {
-  // useSearchParams는 Suspense 경계 필요 (Next App Router)
   return (
     <Suspense
       fallback={
@@ -724,4 +821,3 @@ export default function BoardWritePage() {
     </Suspense>
   );
 }
-```
