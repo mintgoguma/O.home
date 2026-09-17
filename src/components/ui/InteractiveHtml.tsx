@@ -1,4 +1,3 @@
-```tsx
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -10,8 +9,7 @@ interface InteractiveHtmlProps {
 export function InteractiveHtml({
   html,
 }: InteractiveHtmlProps) {
-  const iframeRef =
-    useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -41,4 +39,3 @@ export function InteractiveHtml({
     />
   );
 }
-```
