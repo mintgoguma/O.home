@@ -1,11 +1,23 @@
-```tsx
 'use client';
+
 // 게시글 상세 (4.2) — 본문 렌더(격리 새니타이즈) · 접기 · 댓글+대댓글
 import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useLocalList, BOARD_SEED, Post, Comment, newId, fmtDate } from '@/lib/postStore';
-import { useBoards, boardHref, MAIN_BOARD_ID, BoardPerm } from '@/lib/boardStore';
+import {
+  useLocalList,
+  BOARD_SEED,
+  Post,
+  Comment,
+  newId,
+  fmtDate,
+} from '@/lib/postStore';
+import {
+  useBoards,
+  boardHref,
+  MAIN_BOARD_ID,
+  BoardPerm,
+} from '@/lib/boardStore';
 import { renderBody } from '@/lib/sanitize';
 import { InteractiveHtml } from '@/components/ui/InteractiveHtml';
 import { KInput } from '@/components/ui/Kit';
@@ -14,38 +26,49 @@ import { GuestIdBar } from '@/components/ui/GuestId';
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle } from '@/components/ui/PageText';
 
-const FOLD_LABEL = { spoiler: '스포일러 주의', adult: '수위 주의' };
+const FOLD_LABEL = {
+  spoiler: '스포일러 주의',
+  adult: '수위 주의',
+};
 
 export default function BoardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
   const toast = useToast();
-  const [posts, setPosts, loaded] = useLocalList<Post>('ohome.board.v1', BOARD_SEED);
-  const { boards } = useBoards();                  // 소속 게시판 (5.2 다중 게시판)
-  const [open, setOpen] = useState(false);         // 접기 해제
+
+  const [posts, setPosts, loaded] = useLocalList<Post>(
+    'ohome.board.v1',
+    BOARD_SEED
+  );
+
+  const { boards } = useBoards();
+
+  const [open, setOpen] = useState(false);
   const [cmt, setCmt] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [delAsk, setDelAsk] = useState(false);
-  const [gName, setGName] = useState('');                       // 게스트 닉네임 (방문자 댓글 허용 시)
-  const [gPw, setGPw] = useState('');                           // 게스트 비밀번호
-  const [pwAsk, setPwAsk] = useState<Comment | null>(null);     // 게스트 댓글 삭제 — 비밀번호 확인
+
+  const [gName, setGName] = useState('');
+  const [gPw, setGPw] = useState('');
+
+  const [pwAsk, setPwAsk] = useState<Comment | null>(null);
   const [pwInput, setPwInput] = useState('');
 
-  const post = posts.find(p => p.id === id);
+  const post = posts.find((p) => p.id === id);
 
-  // loaded 이후에만 본문 렌더 (SSR/하이드레이션 불일치 방지)
-  // 인터랙티브 HTML은 별도 iframe에서 렌더링하므로 여기서는 일반 HTML/MD만 처리
-  const html = useMemo(
-    () => (
-      post && loaded && post.contentType !== 'interactive'
-        ? renderBody(post.mode, post.body)
-        : ''
-    ),
-    [post, loaded]
-  );
+  // 인터랙티브 HTML은 iframe에서 별도로 실행하므로
+  // 여기서는 일반 HTML / Markdown만 새니타이즈해서 렌더링한다.
+  const html = useMemo(() => {
+    if (!post || !loaded) return '';
+    if (post.contentType === 'interactive') return '';
 
-  if (!loaded) return <section className="page" />;
+    return renderBody(post.mode, post.body);
+  }, [post, loaded]);
+
+  if (!loaded) {
+    return <section className="page" />;
+  }
 
   if (!post) {
     return (
@@ -70,20 +93,22 @@ export default function BoardDetailPage() {
   }
 
   const board =
-    boards.find(b => b.id === (post.boardId ?? MAIN_BOARD_ID)) ?? boards[0];
+    boards.find(
+      (b) => b.id === (post.boardId ?? MAIN_BOARD_ID)
+    ) ?? boards[0];
 
   const boardTitle =
     board.id === MAIN_BOARD_ID ? 'BOARD' : board.name;
 
-  // 댓글 권한 (5.2) — 방문자 허용 시 게스트 작성
-  const allow = (p: BoardPerm) =>
-    p === 'admin'
-      ? isAdmin
-      : p === 'member'
-        ? !!user
-        : true;
+  // 댓글 권한
+  const allow = (p: BoardPerm) => {
+    if (p === 'admin') return isAdmin;
+    if (p === 'member') return !!user;
+    return true;
+  };
 
-  const guestMode = !user && board.permComment === 'guest';
+  const guestMode =
+    !user && board.permComment === 'guest';
 
   const canComment =
     allow(board.permComment) && (!!user || guestMode);
@@ -91,14 +116,15 @@ export default function BoardDetailPage() {
   const canManage =
     isAdmin || post.authorId === user?.id;
 
-  const update = (patch: Partial<Post>) =>
+  const update = (patch: Partial<Post>) => {
     setPosts(
-      posts.map(p =>
+      posts.map((p) =>
         p.id === post.id
           ? { ...p, ...patch }
           : p
       )
     );
+  };
 
   const addComment = () => {
     if (!canComment) {
@@ -140,13 +166,14 @@ export default function BoardDetailPage() {
     setReplyTo(null);
   };
 
-  // 게스트 댓글 삭제 — 작성 시 비밀번호 확인
-  const removeComment = (c: Comment) =>
+  // 게스트 댓글 삭제
+  const removeComment = (c: Comment) => {
     update({
       comments: post.comments.filter(
-        x => x.id !== c.id && x.parentId !== c.id
+        (x) => x.id !== c.id && x.parentId !== c.id
       ),
     });
+  };
 
   const confirmPw = () => {
     if (!pwAsk) return;
@@ -160,10 +187,14 @@ export default function BoardDetailPage() {
     setPwAsk(null);
   };
 
-  const roots = post.comments.filter(c => !c.parentId);
+  const roots = post.comments.filter(
+    (c) => !c.parentId
+  );
 
   const childrenOf = (pid: string) =>
-    post.comments.filter(c => c.parentId === pid);
+    post.comments.filter(
+      (c) => c.parentId === pid
+    );
 
   const CmtRow = ({
     c,
@@ -171,59 +202,76 @@ export default function BoardDetailPage() {
   }: {
     c: Comment;
     depth: number;
-  }) => (
-    <div className={`cmt ${depth > 0 ? 'reply-depth' : ''}`}>
-      <b>{c.author}</b>
-      <small>{fmtDate(c.date)}</small>
+  }) => {
+    const isReply = depth > 0;
 
-      {canComment && depth === 0 && (
-        <small
-          style={{
-            cursor: 'var(--cur-pointer,pointer)',
-            color: 'var(--accent)',
-            marginLeft: 8,
-          }}
-          onClick={() =>
-            setReplyTo(
-              replyTo === c.id
-                ? null
-                : c.id
-            )
-          }
-        >
-          {replyTo === c.id
-            ? '답글 취소'
-            : '답글'}
-        </small>
-      )}
+    const canDelete =
+      isAdmin ||
+      (!!user && c.authorId === user.id) ||
+      (!c.authorId && !!c.guestPw);
 
-      {(isAdmin ||
-        (user && c.authorId === user.id) ||
-        (!c.authorId && c.guestPw)) && (
-        <small
-          style={{
-            cursor: 'var(--cur-pointer,pointer)',
-            marginLeft: 8,
-          }}
-          onClick={() => {
-            if (
-              isAdmin ||
-              (user && c.authorId === user.id)
-            ) {
-              removeComment(c);
-            } else {
-              setPwInput('');
-              setPwAsk(c);
-            }
-          }}
-        >
-          삭제
-        </small>
-      )}
+    const handleDelete = () => {
+      if (
+        isAdmin ||
+        (!!user && c.authorId === user.id)
+      ) {
+        removeComment(c);
+        return;
+      }
 
-      <p>{c.text}</p>
-    </div>
-  );
+      setPwInput('');
+      setPwAsk(c);
+    };
+
+    const handleReply = () => {
+      setReplyTo(
+        replyTo === c.id
+          ? null
+          : c.id
+      );
+    };
+
+    return (
+      <div
+        className={`cmt ${
+          isReply ? 'reply-depth' : ''
+        }`}
+      >
+        <b>{c.author}</b>
+
+        <small>{fmtDate(c.date)}</small>
+
+        {canComment && !isReply && (
+          <small
+            style={{
+              cursor: 'var(--cur-pointer,pointer)',
+              color: 'var(--accent)',
+              marginLeft: 8,
+            }}
+            onClick={handleReply}
+          >
+            {replyTo === c.id
+              ? '답글 취소'
+              : '답글'}
+          </small>
+        )}
+
+        {canDelete && (
+          <small
+            style={{
+              cursor: 'var(--cur-pointer,pointer)',
+              marginLeft: 8,
+            }}
+            onClick={handleDelete}
+          >
+            삭제
+          </small>
+        )}
+
+        <p>{c.text}</p>
+      </div>
+    );
+  };
 
   return (
     <section className="page">
@@ -240,7 +288,7 @@ export default function BoardDetailPage() {
         </p>
 
         <div className="head-actions">
-          {/* 수정은 작성자 본인만 — 관리자도 타인 글은 삭제만 */}
+          {/* 수정은 작성자 본인만 */}
           {post.authorId === user?.id && (
             <button
               className="btn btn-dark"
@@ -267,7 +315,9 @@ export default function BoardDetailPage() {
 
       <div
         className="panel"
-        style={{ padding: '26px 28px' }}
+        style={{
+          padding: '26px 28px',
+        }}
       >
         <h2
           style={{
@@ -290,7 +340,7 @@ export default function BoardDetailPage() {
           {post.mode.toUpperCase()}
         </p>
 
-        {/* 접기 (6.2) — 흐림 커버, 클릭 시 표시 */}
+        {/* 접기 */}
         <div
           className={`veil ${
             !post.fold || open ? 'open' : ''
@@ -300,7 +350,9 @@ export default function BoardDetailPage() {
             <div
               className="cover"
               onClick={() => setOpen(true)}
-              style={{ position: 'absolute' }}
+              style={{
+                position: 'absolute',
+              }}
             >
               <div>
                 <b>
@@ -338,8 +390,7 @@ export default function BoardDetailPage() {
             />
           )}
 
-          {/* 인터랙티브 HTML
-              script가 실행되는 격리 iframe */}
+          {/* 인터랙티브 HTML */}
           {post.contentType === 'interactive' && (
             <InteractiveHtml
               html={post.body}
@@ -381,11 +432,14 @@ export default function BoardDetailPage() {
             )}
           </h4>
 
-          {roots.map(c => (
+          {roots.map((c) => (
             <React.Fragment key={c.id}>
-              <CmtRow c={c} depth={0} />
+              <CmtRow
+                c={c}
+                depth={0}
+              />
 
-              {childrenOf(c.id).map(cc => (
+              {childrenOf(c.id).map((cc) => (
                 <CmtRow
                   key={cc.id}
                   c={cc}
@@ -408,7 +462,6 @@ export default function BoardDetailPage() {
         </div>
 
         {canComment ? (
-          /* 게스트 작성 — GUEST 바 + 입력줄 */
           <div
             className={`cmt-input ${
               guestMode ? 'guest' : ''
@@ -438,12 +491,13 @@ export default function BoardDetailPage() {
                     : '댓글 남기기...'
                 }
                 value={cmt}
-                onChange={e =>
+                onChange={(e) =>
                   setCmt(e.target.value)
                 }
-                onKeyDown={e => {
-                  if (e.key === 'Enter')
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
                     addComment();
+                  }
                 }}
               />
 
@@ -472,7 +526,7 @@ export default function BoardDetailPage() {
         )}
       </div>
 
-      {/* 게스트 댓글 삭제 — 작성 시 입력한 비밀번호 확인 */}
+      {/* 게스트 댓글 삭제 */}
       <Modal
         open={pwAsk !== null}
         onClose={() => setPwAsk(null)}
@@ -501,12 +555,13 @@ export default function BoardDetailPage() {
           type="password"
           value={pwInput}
           autoFocus
-          onChange={e =>
+          onChange={(e) =>
             setPwInput(e.target.value)
           }
-          onKeyDown={e => {
-            if (e.key === 'Enter')
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
               confirmPw();
+            }
           }}
         />
       </Modal>
@@ -523,9 +578,10 @@ export default function BoardDetailPage() {
             onClick: () => {
               setPosts(
                 posts.filter(
-                  p => p.id !== post.id
+                  (p) => p.id !== post.id
                 )
               );
+
               router.push(
                 boardHref(board.id)
               );
@@ -542,5 +598,3 @@ export default function BoardDetailPage() {
     </section>
   );
 }
-```
-
