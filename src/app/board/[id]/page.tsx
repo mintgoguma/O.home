@@ -1,3 +1,4 @@
+```tsx
 'use client';
 // 게시글 상세 (4.2) — 본문 렌더(격리 새니타이즈) · 접기 · 댓글+대댓글
 import React, { useMemo, useState } from 'react';
@@ -32,86 +33,194 @@ export default function BoardDetailPage() {
   const [pwInput, setPwInput] = useState('');
 
   const post = posts.find(p => p.id === id);
+
   // loaded 이후에만 본문 렌더 (SSR/하이드레이션 불일치 방지)
-  const html = useMemo(() => (post && loaded ? renderBody(post.mode, post.body) : ''), [post, loaded]);
+  // 인터랙티브 HTML은 별도 iframe에서 렌더링하므로 여기서는 일반 HTML/MD만 처리
+  const html = useMemo(
+    () => (
+      post && loaded && post.contentType !== 'interactive'
+        ? renderBody(post.mode, post.body)
+        : ''
+    ),
+    [post, loaded]
+  );
 
   if (!loaded) return <section className="page" />;
+
   if (!post) {
     return (
       <section className="page">
-        <div className="page-head"><PageTitle>BOARD</PageTitle><p>글을 찾을 수 없습니다</p></div>
+        <div className="page-head">
+          <PageTitle>BOARD</PageTitle>
+          <p>글을 찾을 수 없습니다</p>
+        </div>
       </section>
     );
   }
+
   if (post.secret && !isAdmin && post.authorId !== user?.id) {
     return (
       <section className="page">
-        <div className="page-head"><PageTitle>BOARD</PageTitle><p>비밀글 — 작성자와 관리자만 열람할 수 있습니다</p></div>
+        <div className="page-head">
+          <PageTitle>BOARD</PageTitle>
+          <p>비밀글 — 작성자와 관리자만 열람할 수 있습니다</p>
+        </div>
       </section>
     );
   }
 
-  const board = boards.find(b => b.id === (post.boardId ?? MAIN_BOARD_ID)) ?? boards[0];
-  const boardTitle = board.id === MAIN_BOARD_ID ? 'BOARD' : board.name;
-  // 댓글 권한 (5.2) — 방문자 허용 시 게스트 작성(닉네임+비밀번호, 방명록 4.7 규칙)
-  const allow = (p: BoardPerm) => (p === 'admin' ? isAdmin : p === 'member' ? !!user : true);
-  const guestMode = !user && board.permComment === 'guest';
-  const canComment = allow(board.permComment) && (!!user || guestMode);
+  const board =
+    boards.find(b => b.id === (post.boardId ?? MAIN_BOARD_ID)) ?? boards[0];
 
-  const canManage = isAdmin || post.authorId === user?.id;
+  const boardTitle =
+    board.id === MAIN_BOARD_ID ? 'BOARD' : board.name;
+
+  // 댓글 권한 (5.2) — 방문자 허용 시 게스트 작성
+  const allow = (p: BoardPerm) =>
+    p === 'admin'
+      ? isAdmin
+      : p === 'member'
+        ? !!user
+        : true;
+
+  const guestMode = !user && board.permComment === 'guest';
+
+  const canComment =
+    allow(board.permComment) && (!!user || guestMode);
+
+  const canManage =
+    isAdmin || post.authorId === user?.id;
+
   const update = (patch: Partial<Post>) =>
-    setPosts(posts.map(p => (p.id === post.id ? { ...p, ...patch } : p)));
+    setPosts(
+      posts.map(p =>
+        p.id === post.id
+          ? { ...p, ...patch }
+          : p
+      )
+    );
 
   const addComment = () => {
-    if (!canComment) { toast('댓글은 로그인 후 작성할 수 있습니다'); return; }
+    if (!canComment) {
+      toast('댓글은 로그인 후 작성할 수 있습니다');
+      return;
+    }
+
     if (!cmt.trim()) return;
-    if (guestMode && (!gName.trim() || !gPw)) { toast('게스트는 닉네임과 비밀번호를 입력해 주세요'); return; }
+
+    if (guestMode && (!gName.trim() || !gPw)) {
+      toast('게스트는 닉네임과 비밀번호를 입력해 주세요');
+      return;
+    }
+
     const c: Comment = user
       ? {
-        id: newId(), author: user.nickname, authorId: user.id,
-        text: cmt.trim(), date: new Date().toISOString(),
-        parentId: replyTo ?? undefined,
-      }
+          id: newId(),
+          author: user.nickname,
+          authorId: user.id,
+          text: cmt.trim(),
+          date: new Date().toISOString(),
+          parentId: replyTo ?? undefined,
+        }
       : {
-        id: newId(), author: gName.trim(), authorId: '', guestPw: gPw,
-        text: cmt.trim(), date: new Date().toISOString(),
-        parentId: replyTo ?? undefined,
-      };
-    update({ comments: [...post.comments, c] });
-    setCmt(''); setReplyTo(null);
+          id: newId(),
+          author: gName.trim(),
+          authorId: '',
+          guestPw: gPw,
+          text: cmt.trim(),
+          date: new Date().toISOString(),
+          parentId: replyTo ?? undefined,
+        };
+
+    update({
+      comments: [...post.comments, c],
+    });
+
+    setCmt('');
+    setReplyTo(null);
   };
 
   // 게스트 댓글 삭제 — 작성 시 비밀번호 확인
   const removeComment = (c: Comment) =>
-    update({ comments: post.comments.filter(x => x.id !== c.id && x.parentId !== c.id) });
+    update({
+      comments: post.comments.filter(
+        x => x.id !== c.id && x.parentId !== c.id
+      ),
+    });
+
   const confirmPw = () => {
     if (!pwAsk) return;
-    if (pwInput !== pwAsk.guestPw) { toast('비밀번호가 일치하지 않습니다'); return; }
+
+    if (pwInput !== pwAsk.guestPw) {
+      toast('비밀번호가 일치하지 않습니다');
+      return;
+    }
+
     removeComment(pwAsk);
     setPwAsk(null);
   };
 
   const roots = post.comments.filter(c => !c.parentId);
-  const childrenOf = (pid: string) => post.comments.filter(c => c.parentId === pid);
 
-  const CmtRow = ({ c, depth }: { c: Comment; depth: number }) => (
+  const childrenOf = (pid: string) =>
+    post.comments.filter(c => c.parentId === pid);
+
+  const CmtRow = ({
+    c,
+    depth,
+  }: {
+    c: Comment;
+    depth: number;
+  }) => (
     <div className={`cmt ${depth > 0 ? 'reply-depth' : ''}`}>
-      <b>{c.author}</b><small>{fmtDate(c.date)}</small>
+      <b>{c.author}</b>
+      <small>{fmtDate(c.date)}</small>
+
       {canComment && depth === 0 && (
-        <small style={{ cursor: 'var(--cur-pointer,pointer)', color: 'var(--accent)', marginLeft: 8 }}
-          onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>
-          {replyTo === c.id ? '답글 취소' : '답글'}
+        <small
+          style={{
+            cursor: 'var(--cur-pointer,pointer)',
+            color: 'var(--accent)',
+            marginLeft: 8,
+          }}
+          onClick={() =>
+            setReplyTo(
+              replyTo === c.id
+                ? null
+                : c.id
+            )
+          }
+        >
+          {replyTo === c.id
+            ? '답글 취소'
+            : '답글'}
         </small>
       )}
-      {(isAdmin || (user && c.authorId === user.id) || (!c.authorId && c.guestPw)) && (
-        <small style={{ cursor: 'var(--cur-pointer,pointer)', marginLeft: 8 }}
+
+      {(isAdmin ||
+        (user && c.authorId === user.id) ||
+        (!c.authorId && c.guestPw)) && (
+        <small
+          style={{
+            cursor: 'var(--cur-pointer,pointer)',
+            marginLeft: 8,
+          }}
           onClick={() => {
-            if (isAdmin || (user && c.authorId === user.id)) removeComment(c);
-            else { setPwInput(''); setPwAsk(c); }   // 게스트 댓글 — 비밀번호 확인
-          }}>
+            if (
+              isAdmin ||
+              (user && c.authorId === user.id)
+            ) {
+              removeComment(c);
+            } else {
+              setPwInput('');
+              setPwAsk(c);
+            }
+          }}
+        >
           삭제
         </small>
       )}
+
       <p>{c.text}</p>
     </div>
   );
@@ -119,95 +228,319 @@ export default function BoardDetailPage() {
   return (
     <section className="page">
       <div className="page-head">
-        <PageTitle href={boardHref(board.id)}>{boardTitle}</PageTitle>
-        <p>{post.notice ? '공지 · ' : `${post.category} · `}{post.author} · {fmtDate(post.date)}</p>
+        <PageTitle href={boardHref(board.id)}>
+          {boardTitle}
+        </PageTitle>
+
+        <p>
+          {post.notice
+            ? '공지 · '
+            : `${post.category} · `}
+          {post.author} · {fmtDate(post.date)}
+        </p>
+
         <div className="head-actions">
-          {/* 수정은 작성자 본인만 — 관리자도 타인 글은 삭제만 (v1.9) */}
+          {/* 수정은 작성자 본인만 — 관리자도 타인 글은 삭제만 */}
           {post.authorId === user?.id && (
-            <button className="btn btn-dark" onClick={() => router.push(`/board/write?edit=${post.id}`)}>EDIT</button>
+            <button
+              className="btn btn-dark"
+              onClick={() =>
+                router.push(
+                  `/board/write?edit=${post.id}`
+                )
+              }
+            >
+              EDIT
+            </button>
           )}
+
           {canManage && (
-            <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>
+            <button
+              className="btn btn-dark"
+              onClick={() => setDelAsk(true)}
+            >
+              DELETE
+            </button>
           )}
         </div>
       </div>
 
-      <div className="panel" style={{ padding: '26px 28px' }}>
-        <h2 style={{ fontSize: 19, marginBottom: 4 }}>
-          {post.secret && '🔒 '}{post.title}
+      <div
+        className="panel"
+        style={{ padding: '26px 28px' }}
+      >
+        <h2
+          style={{
+            fontSize: 19,
+            marginBottom: 4,
+          }}
+        >
+          {post.secret && '🔒 '}
+          {post.title}
         </h2>
-        <p style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 18 }}>
-          {post.author} · {fmtDate(post.date)} · {post.mode.toUpperCase()}
+
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--faint)',
+            marginBottom: 18,
+          }}
+        >
+          {post.author} · {fmtDate(post.date)} ·{' '}
+          {post.mode.toUpperCase()}
         </p>
 
         {/* 접기 (6.2) — 흐림 커버, 클릭 시 표시 */}
-        <div className={`veil ${!post.fold || open ? 'open' : ''}`}>
+        <div
+          className={`veil ${
+            !post.fold || open ? 'open' : ''
+          }`}
+        >
           {post.fold && !open && (
-            <div className="cover" onClick={() => setOpen(true)} style={{ position: 'absolute' }}>
+            <div
+              className="cover"
+              onClick={() => setOpen(true)}
+              style={{ position: 'absolute' }}
+            >
               <div>
-                <b>{post.fold.type === 'custom' ? (post.fold.label || '접힌 글') : FOLD_LABEL[post.fold.type]}</b>
-                <span style={{ display: 'block' }}>클릭하면 내용이 표시됩니다</span>
+                <b>
+                  {post.fold.type === 'custom'
+                    ? post.fold.label || '접힌 글'
+                    : FOLD_LABEL[post.fold.type]}
+                </b>
+
+                <span
+                  style={{
+                    display: 'block',
+                  }}
+                >
+                  클릭하면 내용이 표시됩니다
+                </span>
               </div>
             </div>
           )}
-          <div className="post-body" style={post.fold && !open ? { minHeight: 120, filter: 'blur(6px)' } : undefined}
-            dangerouslySetInnerHTML={{ __html: html }} />
+
+          {/* 일반 HTML / Markdown */}
+          {post.contentType !== 'interactive' && (
+            <div
+              className="post-body"
+              style={
+                post.fold && !open
+                  ? {
+                      minHeight: 120,
+                      filter: 'blur(6px)',
+                    }
+                  : undefined
+              }
+              dangerouslySetInnerHTML={{
+                __html: html,
+              }}
+            />
+          )}
+
+          {/* 인터랙티브 HTML
+              script가 실행되는 격리 iframe */}
+          {post.contentType === 'interactive' && (
+            <InteractiveHtml
+              html={post.body}
+            />
+          )}
         </div>
       </div>
 
       {/* 댓글 + 대댓글 */}
-      <div className="panel" style={{ padding: 0, marginTop: 16 }}>
-        <div style={{ padding: '16px 18px' }}>
-          <h4 style={{ fontSize: 11.5, letterSpacing: '.12em', color: 'var(--faint)', marginBottom: 13 }}>
-            COMMENTS {post.comments.length > 0 && <span style={{ color: 'var(--accent)' }}>{post.comments.length}</span>}
+      <div
+        className="panel"
+        style={{
+          padding: 0,
+          marginTop: 16,
+        }}
+      >
+        <div
+          style={{
+            padding: '16px 18px',
+          }}
+        >
+          <h4
+            style={{
+              fontSize: 11.5,
+              letterSpacing: '.12em',
+              color: 'var(--faint)',
+              marginBottom: 13,
+            }}
+          >
+            COMMENTS{' '}
+            {post.comments.length > 0 && (
+              <span
+                style={{
+                  color: 'var(--accent)',
+                }}
+              >
+                {post.comments.length}
+              </span>
+            )}
           </h4>
+
           {roots.map(c => (
             <React.Fragment key={c.id}>
               <CmtRow c={c} depth={0} />
-              {childrenOf(c.id).map(cc => <CmtRow key={cc.id} c={cc} depth={1} />)}
+
+              {childrenOf(c.id).map(cc => (
+                <CmtRow
+                  key={cc.id}
+                  c={cc}
+                  depth={1}
+                />
+              ))}
             </React.Fragment>
           ))}
+
           {post.comments.length === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--faint)' }}>첫 댓글을 남겨보세요</p>
+            <p
+              style={{
+                fontSize: 12,
+                color: 'var(--faint)',
+              }}
+            >
+              첫 댓글을 남겨보세요
+            </p>
           )}
         </div>
+
         {canComment ? (
-          /* 게스트 작성(방문자 허용) — 구분선 아래 GUEST 바 + 입력줄 세로 배치 */
-          <div className={`cmt-input ${guestMode ? 'guest' : ''}`}>
-            {guestMode && <GuestIdBar name={gName} pw={gPw} onName={setGName} onPw={setGPw} />}
-            <div className="ci-row" style={guestMode ? undefined : { display: 'contents' }}>
-              <KInput
-                placeholder={replyTo ? '답글 작성...' : '댓글 남기기...'}
-                value={cmt} onChange={e => setCmt(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addComment(); }}
+          /* 게스트 작성 — GUEST 바 + 입력줄 */
+          <div
+            className={`cmt-input ${
+              guestMode ? 'guest' : ''
+            }`}
+          >
+            {guestMode && (
+              <GuestIdBar
+                name={gName}
+                pw={gPw}
+                onName={setGName}
+                onPw={setGPw}
               />
-              <button className="btn btn-dark" onClick={addComment}>POST</button>
+            )}
+
+            <div
+              className="ci-row"
+              style={
+                guestMode
+                  ? undefined
+                  : { display: 'contents' }
+              }
+            >
+              <KInput
+                placeholder={
+                  replyTo
+                    ? '답글 작성...'
+                    : '댓글 남기기...'
+                }
+                value={cmt}
+                onChange={e =>
+                  setCmt(e.target.value)
+                }
+                onKeyDown={e => {
+                  if (e.key === 'Enter')
+                    addComment();
+                }}
+              />
+
+              <button
+                className="btn btn-dark"
+                onClick={addComment}
+              >
+                POST
+              </button>
             </div>
           </div>
         ) : (
-          <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', fontSize: 11.5, color: 'var(--faint)' }}>
-            {user ? '이 게시판은 관리자만 댓글을 쓸 수 있습니다' : '댓글은 로그인 후 작성할 수 있습니다'}
+          <div
+            style={{
+              padding: '12px 18px',
+              borderTop:
+                '1px solid var(--line)',
+              fontSize: 11.5,
+              color: 'var(--faint)',
+            }}
+          >
+            {user
+              ? '이 게시판은 관리자만 댓글을 쓸 수 있습니다'
+              : '댓글은 로그인 후 작성할 수 있습니다'}
           </div>
         )}
       </div>
 
       {/* 게스트 댓글 삭제 — 작성 시 입력한 비밀번호 확인 */}
-      <Modal open={pwAsk !== null} onClose={() => setPwAsk(null)} small title="댓글 삭제"
-        actions={<>
-          <button className="btn btn-ghost" onClick={() => setPwAsk(null)}>CANCEL</button>
-          <button className="btn btn-dark" onClick={confirmPw}>OK</button>
-        </>}>
-        <KInput placeholder="작성 시 입력한 비밀번호" type="password" value={pwInput} autoFocus
-          onChange={e => setPwInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') confirmPw(); }} />
+      <Modal
+        open={pwAsk !== null}
+        onClose={() => setPwAsk(null)}
+        small
+        title="댓글 삭제"
+        actions={
+          <>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setPwAsk(null)}
+            >
+              CANCEL
+            </button>
+
+            <button
+              className="btn btn-dark"
+              onClick={confirmPw}
+            >
+              OK
+            </button>
+          </>
+        }
+      >
+        <KInput
+          placeholder="작성 시 입력한 비밀번호"
+          type="password"
+          value={pwInput}
+          autoFocus
+          onChange={e =>
+            setPwInput(e.target.value)
+          }
+          onKeyDown={e => {
+            if (e.key === 'Enter')
+              confirmPw();
+          }}
+        />
       </Modal>
 
-      <ConfirmModal open={delAsk} title="글을 삭제하시겠습니까?" body="삭제한 글은 복구할 수 없습니다."
+      <ConfirmModal
+        open={delAsk}
+        title="글을 삭제하시겠습니까?"
+        body="삭제한 글은 복구할 수 없습니다."
         onClose={() => setDelAsk(false)}
         buttons={[
-          { label: 'DELETE', kind: 'accent', onClick: () => { setPosts(posts.filter(p => p.id !== post.id)); router.push(boardHref(board.id)); } },
-          { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
-        ]} />
+          {
+            label: 'DELETE',
+            kind: 'accent',
+            onClick: () => {
+              setPosts(
+                posts.filter(
+                  p => p.id !== post.id
+                )
+              );
+              router.push(
+                boardHref(board.id)
+              );
+            },
+          },
+          {
+            label: 'CANCEL',
+            kind: 'ghost',
+            onClick: () =>
+              setDelAsk(false),
+          },
+        ]}
+      />
     </section>
   );
 }
+```
+
