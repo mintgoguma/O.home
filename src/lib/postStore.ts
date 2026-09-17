@@ -18,12 +18,15 @@ export interface Comment {
 }
 
 export type FoldType = 'spoiler' | 'adult' | 'custom';
+export type PostContentType = 'normal' | 'interactive';
 
 export interface Post {
   id: string;
   title: string;
   body: string;
-  mode: PostMode;        // 렌더 방식 (md / html)
+  mode: PostMode;   
+  contentType?: PostContentType;
+  // 렌더 방식 (md / html)
   /** 무엇으로 썼는지 (v2.0) — 에디터로 쓴 글을 수정할 때 HTML 소스가 뜨지 않게 기억한다.
    *  렌더는 mode로 하고, 이 값은 수정 화면을 어떤 모드로 열지에만 쓴다. */
   authored?: 'editor';
