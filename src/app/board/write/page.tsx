@@ -63,6 +63,7 @@ function WriteInner() {
     // 에디터로 쓴 글을 수정하면 갑자기 태그가 보였다 (authored 없는 옛 글은 지금까지대로 HTML)
     setWriteMode(p.mode === 'md' ? 'md' : (p.authored === 'editor' ? 'editor' : 'html'));
     setCategory(p.category);
+    setContentType(p.contentType ?? 'normal');
     setSecret(p.secret); setNotice(p.notice);
     setFoldType(p.fold?.type ?? 'none'); setFoldLabel(p.fold?.label ?? '');
     setThumbSrc(p.thumbSrc); setThumbCrop(p.thumbCrop);
