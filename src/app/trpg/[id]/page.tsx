@@ -83,8 +83,8 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
   const stop = () => { setPlayingId(''); setActiveTempUrl(''); };
   return (
     <>
-      <button type="button" onClick={() => setOpen(v => !v)} aria-label="BGM 창 열기" style={{ position: 'fixed', left: 22, top: '42%', zIndex: 10000, border: '1px solid var(--line)', borderRadius: 999, padding: '13px 18px', background: 'var(--panel)', color: 'var(--text)', boxShadow: '0 5px 24px rgba(0,0,0,.22)', cursor: 'pointer', fontWeight: 700 }}>🎵 BGM {currentUrl ? '▶' : ''}</button>
-      <section className="panel" aria-hidden={!open} style={{ position: 'fixed', left: 22, top: 'calc(42% + 58px)', zIndex: 10001, width: 'min(400px, calc(100vw - 44px))', height: 'min(520px, 70vh)', minWidth: 280, minHeight: 180, maxWidth: 'calc(100vw - 44px)', maxHeight: '85vh', overflow: 'auto', resize: 'both', padding: 14, display: open ? 'grid' : 'none', gap: 12, boxShadow: '0 8px 36px rgba(0,0,0,.28)' }}>
+      <button type="button" onClick={() => setOpen(v => !v)} aria-label="BGM 창 열기" style={{ position: 'fixed', left: 22, top: '25%', zIndex: 10000, border: '1px solid var(--line)', borderRadius: 999, padding: '13px 18px', background: 'var(--panel)', color: 'var(--text)', boxShadow: '0 5px 24px rgba(0,0,0,.22)', cursor: 'pointer', fontWeight: 700 }}>🎵 BGM {currentUrl ? '▶' : ''}</button>
+      <section className="panel" aria-hidden={!open} style={{ position: 'fixed', left: 22, top: 'calc(25% + 58px)', zIndex: 10001, width: 'min(400px, calc(100vw - 44px))', height: 'min(520px, 70vh)', minWidth: 280, minHeight: 180, maxWidth: 'calc(100vw - 44px)', maxHeight: '85vh', overflow: 'auto', resize: 'both', padding: 14, display: open ? 'grid' : 'none', gap: 12, boxShadow: '0 8px 36px rgba(0,0,0,.28)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <b style={{ fontSize: 14 }}>🎵 로그 BGM</b>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
