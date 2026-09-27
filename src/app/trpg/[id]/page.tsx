@@ -15,6 +15,125 @@ import { ColorField } from '@/components/ui/ColorField';
 import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
 import { useToast } from '@/components/ui/Toast';
 
+
+type BgmTrack = { id: string; scene: string; url: string };
+
+function youtubeId(raw: string): string | null {
+  try {
+    const u = new URL(raw.trim());
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0] || null;
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      if (u.pathname === '/watch') return u.searchParams.get('v');
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (['embed', 'shorts', 'live'].includes(parts[0] || '')) return parts[1] || null;
+    }
+  } catch { /* 링크 형식 오류 */ }
+  return null;
+}
+
+function TrpgBgmPlayer({ logId }: { logId: string }) {
+  const storageKey = `ohome.trpg.bgm.v1:${logId}`;
+  const [mode, setMode] = useState<'temporary' | 'playlist'>('temporary');
+  const [collapsed, setCollapsed] = useState(false);
+  const [tempInput, setTempInput] = useState('');
+  const [playingId, setPlayingId] = useState('');
+  const [tracks, setTracks] = useState<BgmTrack[]>([]);
+  const [storageReady, setStorageReady] = useState(false);
+  const [activeTempUrl, setActiveTempUrl] = useState('');
+  const [sceneInput, setSceneInput] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setTracks(parsed.filter((x: any) => x && typeof x.id === 'string' && typeof x.scene === 'string' && typeof x.url === 'string'));
+      }
+    } catch { /* 저장 데이터가 없거나 손상된 경우 무시 */ }
+    setStorageReady(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!storageReady) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(tracks)); } catch { /* 저장 공간 제한 등 */ }
+  }, [storageKey, tracks, storageReady]);
+
+  const currentTrack = tracks.find(t => t.id === playingId);
+  const currentUrl = mode === 'temporary' ? activeTempUrl : currentTrack?.url ?? '';
+  const videoId = youtubeId(currentUrl);
+  const playTemporary = () => {
+    if (!youtubeId(tempInput)) { setError('유효한 유튜브 링크를 입력해 주세요.'); return; }
+    setError('');
+    setMode('temporary');
+    setPlayingId('');
+    setActiveTempUrl(tempInput.trim());
+  };
+  const addTrack = () => {
+    if (!sceneInput.trim()) { setError('장면 이름을 입력해 주세요.'); return; }
+    if (!youtubeId(urlInput)) { setError('유효한 유튜브 링크를 입력해 주세요.'); return; }
+    setTracks(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, scene: sceneInput.trim(), url: urlInput.trim() }]);
+    setSceneInput(''); setUrlInput(''); setError('');
+  };
+  const playTrack = (track: BgmTrack) => {
+    setMode('playlist'); setPlayingId(track.id); setError('');
+  };
+  const stop = () => { setPlayingId(''); setActiveTempUrl(''); };
+  return (
+    <section className="panel" style={{ padding: 14, marginBottom: 18, display: 'grid', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <b style={{ fontSize: 14 }}>🎵 로그 BGM</b>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div className="mini-seg">
+            <button className={mode === 'temporary' ? 'on' : ''} onClick={() => { setMode('temporary'); setError(''); }}>임시 재생</button>
+            <button className={mode === 'playlist' ? 'on' : ''} onClick={() => { setMode('playlist'); setError(''); }}>장면별 재생목록</button>
+          </div>
+          <button className="btn btn-ghost" style={{ padding: '5px 9px', fontSize: 11 }} onClick={() => setCollapsed(v => !v)}>
+            {collapsed ? '펼치기' : '접기'}
+          </button>
+        </div>
+      </div>
+      {!collapsed && <>
+        {mode === 'temporary' ? (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input value={tempInput} onChange={e => setTempInput(e.target.value)} placeholder="유튜브 링크 붙여넣기" style={{ flex: '1 1 280px', minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
+            <button className="btn btn-dark" onClick={playTemporary}>재생</button>
+            <button className="btn btn-ghost" onClick={stop}>정지</button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, .7fr) minmax(180px, 1.5fr) auto', gap: 8 }}>
+              <input value={sceneInput} onChange={e => setSceneInput(e.target.value)} placeholder="장면 이름" style={{ minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
+              <input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="유튜브 링크" style={{ minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
+              <button className="btn btn-dark" onClick={addTrack}>추가</button>
+            </div>
+            {tracks.length > 0 ? <div style={{ display: 'grid', gap: 6 }}>
+              {tracks.map((track, index) => (
+                <div key={track.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 7, background: playingId === track.id ? 'var(--soft)' : 'transparent' }}>
+                  <button className="btn btn-ghost" style={{ flex: 1, textAlign: 'left', justifyContent: 'flex-start' }} onClick={() => playTrack(track)}>
+                    {playingId === track.id ? '▶ ' : ''}{index + 1}. {track.scene}
+                  </button>
+                  <button className="btn btn-ghost" style={{ padding: '5px 8px' }} title="위로" disabled={index === 0} onClick={() => setTracks(prev => { const a = [...prev]; [a[index - 1], a[index]] = [a[index], a[index - 1]]; return a; })}>↑</button>
+                  <button className="btn btn-ghost" style={{ padding: '5px 8px' }} title="아래로" disabled={index === tracks.length - 1} onClick={() => setTracks(prev => { const a = [...prev]; [a[index + 1], a[index]] = [a[index], a[index + 1]]; return a; })}>↓</button>
+                  <button className="btn btn-ghost" style={{ padding: '5px 8px' }} title="삭제" onClick={() => { setTracks(prev => prev.filter(x => x.id !== track.id)); if (playingId === track.id) setPlayingId(''); }}>삭제</button>
+                </div>
+              ))}
+            </div> : <p className="hint" style={{ margin: 0 }}>등록된 장면이 없습니다.</p>}
+          </div>
+        )}
+        {error && <p style={{ color: 'var(--accent)', fontSize: 12, margin: 0 }}>{error}</p>}
+        {videoId ? (
+          <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', aspectRatio: '16 / 9', background: '#000', borderRadius: 8, overflow: 'hidden' }}>
+            <iframe key={`${mode}-${videoId}-${playingId}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0`} title="로그 BGM" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+          </div>
+        ) : <p className="hint" style={{ margin: 0 }}>유튜브 링크를 입력하거나 장면별 재생목록에서 곡을 선택해 주세요.</p>}
+      </>}
+    </section>
+  );
+}
+
 /** 로그 렌더 프레임 — 대형 문서도 안정적으로 로드되도록 srcdoc 대신 Blob URL 사용 */
 function LogFrame({ frameRef, html, title, onFrameLoad, visual, width, height }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>; html: string; title: string;
@@ -328,6 +447,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
         {l.catchphrase && (
           <p style={{ fontSize: 11.5, color: 'var(--faint)', letterSpacing: '.14em', marginBottom: 16 }}>{l.catchphrase}</p>
         )}
+        <TrpgBgmPlayer logId={l.id} />
         {html ? (
           <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
