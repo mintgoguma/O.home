@@ -43,6 +43,7 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
   const [activeTempUrl, setActiveTempUrl] = useState('');
   const [sceneInput, setSceneInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
+  const [bulkInput, setBulkInput] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -80,6 +81,27 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
   const playTrack = (track: BgmTrack) => {
     setMode('playlist'); setPlayingId(track.id); setError('');
   };
+  const importBulkTracks = () => {
+    const lines = bulkInput.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const parsed: BgmTrack[] = [];
+    const invalid: string[] = [];
+    for (const line of lines) {
+      // 한 줄에 '장면 제목 | 유튜브 링크', '장면 제목 - 링크', '제목: 링크', 탭 구분 등을 지원
+      const urlMatch = line.match(/https?:\/\/\S+/i);
+      if (!urlMatch) { invalid.push(line); continue; }
+      const url = urlMatch[0].replace(/[),，。]+$/, '');
+      const scene = line.slice(0, urlMatch.index).replace(/[|｜:：+＋–—-]+\s*$/, '').trim();
+      if (!scene || !youtubeId(url)) { invalid.push(line); continue; }
+      parsed.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${parsed.length}`, scene, url });
+    }
+    if (parsed.length) {
+      setTracks(prev => [...prev, ...parsed]);
+      setBulkInput('');
+      setError(invalid.length ? `${parsed.length}곡을 추가했어. 형식을 확인할 줄: ${invalid.length}개` : `${parsed.length}곡을 장면별 재생목록에 추가했어.`);
+    } else {
+      setError('가져올 수 있는 곡이 없어. 각 줄에 제목과 유튜브 링크를 함께 입력해 줘.');
+    }
+  };
   const stop = () => { setPlayingId(''); setActiveTempUrl(''); };
   return (
     <>
@@ -108,6 +130,11 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
               <input value={sceneInput} onChange={e => setSceneInput(e.target.value)} placeholder="장면 이름" style={{ minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
               <input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="유튜브 링크" style={{ minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
               <button className="btn btn-dark" onClick={addTrack}>추가</button>
+            </div>
+            <div style={{ display: 'grid', gap: 7, padding: 10, border: '1px dashed var(--line)', borderRadius: 8 }}>
+              <b style={{ fontSize: 12 }}>여러 곡 한꺼번에 등록</b>
+              <textarea value={bulkInput} onChange={e => setBulkInput(e.target.value)} placeholder={'한 줄에 제목과 유튜브 링크를 입력해 줘.\n예시) 오프닝 | https://youtu.be/xxxxxxx\n조사 장면 - https://www.youtube.com/watch?v=xxxxxxx'} rows={4} style={{ width: '100%', minWidth: 0, resize: 'vertical', padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)', font: 'inherit', boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-dark" onClick={importBulkTracks} disabled={!bulkInput.trim()}>목록에 일괄 추가</button></div>
             </div>
             {tracks.length > 0 ? <div style={{ display: 'grid', gap: 6 }}>
               {tracks.map((track, index) => (
