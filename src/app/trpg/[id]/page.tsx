@@ -16,9 +16,9 @@ import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
 import { useToast } from '@/components/ui/Toast';
 
 /** 로그 렌더 프레임 — 대형 문서도 안정적으로 로드되도록 srcdoc 대신 Blob URL 사용 */
-function LogFrame({ frameRef, html, title, onFrameLoad }: {
+function LogFrame({ frameRef, html, title, onFrameLoad, visual, width, height }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>; html: string; title: string;
-  onFrameLoad: () => void;
+  onFrameLoad: () => void; visual: boolean; width: number; height: number;
 }) {
   const url = useMemo(() => URL.createObjectURL(new Blob([html], { type: 'text/html' })), [html]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
@@ -26,6 +26,14 @@ function LogFrame({ frameRef, html, title, onFrameLoad }: {
     <iframe
       ref={frameRef}
       className="log-frame"
+      style={visual ? {
+        width: `${width}%`,
+        height: `${height}px`,
+        minHeight: 300,
+        display: 'block',
+        margin: '0 auto',
+        border: '1px solid var(--line)',
+      } : undefined}
       sandbox="allow-scripts"
       src={url}
       title={title}
@@ -50,6 +58,9 @@ export default function TrpgDetailPage() {
   const [bodyText, setBodyText] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const gotHeightRef = useRef(false);   // 안쪽에서 높이 보고가 왔는지 (안 오면 기본 높이로 되돌린다)
+  const [displayMode, setDisplayMode] = useState<'legacy' | 'visual'>('legacy');
+  const [visualWidth, setVisualWidth] = useState(100);
+  const [visualHeight, setVisualHeight] = useState(850);
 
   const l = logs.find(x => x.id === id);
   const bd = bodies.find(x => x.id === id);   // 분리 저장된 본문 — 권한이 없으면 애초에 안 온다 (undefined)
@@ -189,6 +200,8 @@ export default function TrpgDetailPage() {
       if (e.source !== frameRef.current?.contentWindow) return;
       const h = (e.data as { __logH?: unknown })?.__logH;
       if (typeof h === 'number' && isFinite(h) && frameRef.current) {
+        // 비주얼 백업 모드에서는 사용자가 지정한 높이를 유지한다.
+        if (displayMode === 'visual') return;
         // scrollHeight는 최소한 뷰포트(=현재 iframe 높이)만큼 보고되므로 여기에 여백을
         // 더하면 "설정 → 커진 값 보고 → 재설정" 무한 성장 루프가 됨 — 보고값 그대로,
         // 그리고 현재 높이와 사실상 같으면(±2px) 재설정하지 않음
@@ -200,18 +213,27 @@ export default function TrpgDetailPage() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, []);
+  }, [displayMode]);
 
   /** 문서가 뜨는 순간 일단 낮게 줄인다 — 안쪽 높이 계산이 뷰포트(현재 iframe 높이)에 끌려
    *  커지는 것을 막기 위해서다. 곧 오는 보고값으로 내용 높이에 맞춘다.
    *  보고가 오지 않는 문서(스크립트가 없거나 막힌 경우)는 기본 높이로 되돌려 내부 스크롤로 읽게 한다. */
   const onFrameLoad = () => {
     if (!frameRef.current) return;
+    if (displayMode === 'visual') {
+      frameRef.current.style.height = `${visualHeight}px`;
+      return;
+    }
     gotHeightRef.current = false;
     frameRef.current.style.height = '240px';
     setTimeout(() => {
       if (!gotHeightRef.current && frameRef.current) frameRef.current.style.height = '';
     }, 1800);
+  };
+
+  const resetVisual = () => {
+    setVisualWidth(100);
+    setVisualHeight(850);
   };
 
   // 없거나 볼 수 없으면 위 useEffect가 홈으로 보낸다 — 그 사이엔 빈 화면만 (v2.0)
@@ -296,7 +318,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
       </div>
 
       {/* 본문만 폭 제한 — 헤더는 풀폭 위치 유지 */}
-      <div className="panel" style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+      <div className="panel" style={{ padding: 24, width: '100%', maxWidth: 1400, margin: '0 auto' }}>
         <h2 style={{
           fontFamily: l.serifTitle ? 'var(--serif)' : "'Noto Serif KR',serif",
           fontSize: 24, fontWeight: 700,
@@ -307,8 +329,38 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
           <p style={{ fontSize: 11.5, color: 'var(--faint)', letterSpacing: '.14em', marginBottom: 16 }}>{l.catchphrase}</p>
         )}
         {html ? (
-          /* 원본 스타일·스크립트 유지 — 널 오리진 샌드박스라 사이트 데이터에는 접근 불가 (6.3 격리) */
-          <LogFrame frameRef={frameRef} html={srcDoc} title={l.title} onFrameLoad={onFrameLoad} />
+          <>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
+              <div className="mini-seg">
+                <button className={displayMode === 'legacy' ? 'on' : ''} onClick={() => setDisplayMode('legacy')}>기존 버전</button>
+                <button className={displayMode === 'visual' ? 'on' : ''} onClick={() => setDisplayMode('visual')}>비주얼 백업</button>
+              </div>
+              {displayMode === 'visual' && (
+                <button className="btn btn-ghost" style={{ padding: '5px 11px', fontSize: 11 }} onClick={resetVisual}>
+                  크기 초기화
+                </button>
+              )}
+            </div>
+            {displayMode === 'visual' && (
+              <div style={{ display: 'grid', gap: 8, padding: '10px 12px', marginBottom: 12, border: '1px solid var(--line)', borderRadius: 8 }}>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
+                  <span style={{ minWidth: 65 }}>가로 너비</span>
+                  <input type="range" min="40" max="100" value={visualWidth}
+                    onChange={ev => setVisualWidth(Number(ev.target.value))} style={{ flex: 1 }} />
+                  <b style={{ minWidth: 42, textAlign: 'right' }}>{visualWidth}%</b>
+                </label>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
+                  <span style={{ minWidth: 65 }}>세로 높이</span>
+                  <input type="range" min="300" max="2000" step="10" value={visualHeight}
+                    onChange={ev => setVisualHeight(Number(ev.target.value))} style={{ flex: 1 }} />
+                  <b style={{ minWidth: 55, textAlign: 'right' }}>{visualHeight}px</b>
+                </label>
+              </div>
+            )}
+            {/* 기존 버전은 기존 자동 높이 동작, 비주얼 백업은 사용자가 지정한 크기로 표시 */}
+            <LogFrame frameRef={frameRef} html={srcDoc} title={l.title} onFrameLoad={onFrameLoad}
+              visual={displayMode === 'visual'} width={visualWidth} height={visualHeight} />
+          </>
         ) : (
           body
             ? <div className="log-plain">{body}</div>
