@@ -35,7 +35,7 @@ function youtubeId(raw: string): string | null {
 function TrpgBgmPlayer({ logId }: { logId: string }) {
   const storageKey = `ohome.trpg.bgm.v1:${logId}`;
   const [mode, setMode] = useState<'temporary' | 'playlist'>('temporary');
-  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);
   const [tempInput, setTempInput] = useState('');
   const [playingId, setPlayingId] = useState('');
   const [tracks, setTracks] = useState<BgmTrack[]>([]);
@@ -82,7 +82,9 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
   };
   const stop = () => { setPlayingId(''); setActiveTempUrl(''); };
   return (
-    <section className="panel" style={{ padding: 14, marginBottom: 18, display: 'grid', gap: 12 }}>
+    <>
+      <button type="button" onClick={() => setOpen(v => !v)} aria-label="BGM 창 열기" style={{ position: 'fixed', right: 22, bottom: 22, zIndex: 10000, border: '1px solid var(--line)', borderRadius: 999, padding: '13px 18px', background: 'var(--panel)', color: 'var(--text)', boxShadow: '0 5px 24px rgba(0,0,0,.22)', cursor: 'pointer', fontWeight: 700 }}>🎵 BGM {currentUrl ? '▶' : ''}</button>
+      {open && <section className="panel" style={{ position: 'fixed', right: 22, bottom: 82, zIndex: 10001, width: 'min(440px, calc(100vw - 28px))', maxHeight: 'min(75vh, 720px)', overflowY: 'auto', padding: 14, display: 'grid', gap: 12, boxShadow: '0 8px 36px rgba(0,0,0,.28)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <b style={{ fontSize: 14 }}>🎵 로그 BGM</b>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -90,12 +92,10 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
             <button className={mode === 'temporary' ? 'on' : ''} onClick={() => { setMode('temporary'); setError(''); }}>임시 재생</button>
             <button className={mode === 'playlist' ? 'on' : ''} onClick={() => { setMode('playlist'); setError(''); }}>장면별 재생목록</button>
           </div>
-          <button className="btn btn-ghost" style={{ padding: '5px 9px', fontSize: 11 }} onClick={() => setCollapsed(v => !v)}>
-            {collapsed ? '펼치기' : '접기'}
-          </button>
+          <button className="btn btn-ghost" style={{ padding: '5px 9px', fontSize: 11 }} onClick={() => setOpen(false)}>닫기 ✕</button>
         </div>
       </div>
-      {!collapsed && <>
+      {<>
         {mode === 'temporary' ? (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={tempInput} onChange={e => setTempInput(e.target.value)} placeholder="유튜브 링크 붙여넣기" style={{ flex: '1 1 280px', minWidth: 0, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 7, background: 'var(--panel)', color: 'var(--text)' }} />
@@ -130,7 +130,8 @@ function TrpgBgmPlayer({ logId }: { logId: string }) {
           </div>
         ) : <p className="hint" style={{ margin: 0 }}>유튜브 링크를 입력하거나 장면별 재생목록에서 곡을 선택해 주세요.</p>}
       </>}
-    </section>
+      </section>}
+    </>
   );
 }
 
