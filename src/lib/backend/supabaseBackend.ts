@@ -1,6 +1,7 @@
 'use client';
 // Supabase 백엔드 — Postgres 테이블(행 단위) + Auth + Storage + Realtime
 // 스키마·권한: supabase/schema.sql
+
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   Backend,
@@ -137,7 +138,10 @@ export async function createSupabaseBackend(
 
       const { count } = await sb
         .from('profiles')
-        .select('id', { head: true, count: 'exact' })
+        .select('id', {
+          head: true,
+          count: 'exact',
+        })
         .eq('role', 'admin');
 
       const hasAdmin = (count ?? 0) > 0;
@@ -205,6 +209,9 @@ export async function createSupabaseBackend(
         : { ok: true };
     },
 
+    // 프로필 수정
+    // 기존 profiles 행이 있으면 UPDATE
+    // 없으면 nickname을 포함해서 INSERT
     async updateProfile(patch) {
       const { data } = await sb.auth.getUser();
 
@@ -215,25 +222,73 @@ export async function createSupabaseBackend(
         };
       }
 
-      const row: Record<string, unknown> = {
-        id: data.user.id,
-      };
+      const uid = data.user.id;
 
-      if (patch.nickname !== undefined) {
-        row.nickname = patch.nickname;
+      // 먼저 현재 사용자의 profiles 행이 존재하는지 확인
+      const {
+        data: existing,
+        error: readError,
+      } = await sb
+        .from('profiles')
+        .select('id, nickname')
+        .eq('id', uid)
+        .maybeSingle();
+
+      if (readError) {
+        return {
+          ok: false,
+          error: readError.message,
+        };
       }
 
+      // 기존 프로필이 있으면 UPDATE
+      if (existing) {
+        const row: Record<string, unknown> = {};
+
+        if (patch.nickname !== undefined) {
+          row.nickname = patch.nickname;
+        }
+
+        if (patch.avatarUrl !== undefined) {
+          row.avatar_url = patch.avatarUrl ?? null;
+        }
+
+        if (patch.avatarColor !== undefined) {
+          row.avatar_color = patch.avatarColor ?? null;
+        }
+
+        const { error } = await sb
+          .from('profiles')
+          .update(row)
+          .eq('id', uid);
+
+        return error
+          ? { ok: false, error: error.message }
+          : { ok: true };
+      }
+
+      // profiles 행이 아직 없으면
+      // nickname을 반드시 포함해서 INSERT
+      const row: Record<string, unknown> = {
+        id: uid,
+        nickname:
+          patch.nickname ??
+          data.user.user_metadata?.nickname ??
+          data.user.email ??
+          'user',
+      };
+
       if (patch.avatarUrl !== undefined) {
-        row.avatar_url = patch.avatarUrl;
+        row.avatar_url = patch.avatarUrl ?? null;
       }
 
       if (patch.avatarColor !== undefined) {
-        row.avatar_color = patch.avatarColor;
+        row.avatar_color = patch.avatarColor ?? null;
       }
 
       const { error } = await sb
         .from('profiles')
-        .upsert(row, { onConflict: 'id' });
+        .insert(row);
 
       return error
         ? { ok: false, error: error.message }
